@@ -1,0 +1,25 @@
+No human review required:
+
+{
+  "incident_id": "INC-1005",
+  "source": "prometheus",
+  "server": "staging-web-01",
+  "service": "web",
+  "alert_type": "disk_usage",
+  "severity": "low",
+  "message": "Disk usage is at 45%. No threshold has been exceeded and the service is operating normally.",
+  "timestamp": "2026-09-25T16:30:00Z"
+}
+-----------------------------------------------------
+Human review required:
+
+{
+  "incident_id": "INC-1001",
+  "source": "prometheus",
+  "server": "production-api-01",
+  "service": "api",
+  "alert_type": "service_down",
+  "severity": "critical",
+  "message": "The API service is not responding.",
+  "timestamp": "2026-09-25T10:30:00Z"
+}

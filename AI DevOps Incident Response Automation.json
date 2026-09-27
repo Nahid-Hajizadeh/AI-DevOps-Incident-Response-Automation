@@ -1,0 +1,1137 @@
+{
+  "name": "AI DevOps Incident Response Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "devops-incident",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        128
+      ],
+      "id": "57b6e8f0-f39a-4ecd-9692-3eaf5a297bf4",
+      "name": "Webhook",
+      "webhookId": "4b8e8724-7418-4199-bf3a-b1bdc80900d1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.body ?? $json;\n\nconst requiredFields = [\n  'incident_id',\n  'source',\n  'server',\n  'service',\n  'alert_type',\n  'severity',\n  'message',\n  'timestamp'\n];\n\nconst errors = [];\n\nfor (const field of requiredFields) {\n  if (\n    data[field] === undefined ||\n    data[field] === null ||\n    String(data[field]).trim() === ''\n  ) {\n    errors.push(`Missing required field: ${field}`);\n  }\n}\n\nconst allowedSeverities = [\n  'low',\n  'medium',\n  'high',\n  'critical'\n];\n\nif (\n  data.severity &&\n  !allowedSeverities.includes(\n    String(data.severity).toLowerCase()\n  )\n) {\n  errors.push('Invalid severity value');\n}\n\nreturn [\n  {\n    json: {\n      ...data,\n      input_valid: errors.length === 0,\n      validation_errors: errors\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        128
+      ],
+      "id": "ab27fd24-3d26-4746-ae55-91bec0fec8e6",
+      "name": "Validate Incident Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fb3621d0-651f-45f7-bea3-b05fb868cb37",
+              "leftValue": "={{ $json.input_valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        128
+      ],
+      "id": "4d900aa6-509f-47c1-be53-12da8d209726",
+      "name": "Is Input Valid?"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI DevOps incident analysis assistant.\n\nAnalyze the infrastructure incident and return a structured assessment.\n\nYour role:\n- Analyze the incident objectively.\n- Identify the likely incident type.\n- Summarize the problem clearly.\n- Identify probable causes as hypotheses, not confirmed facts.\n- Recommend exactly ONE action from the allowed actions list.\n- Estimate your confidence between 0 and 1.\n- Decide whether human review is needed based on the rules below.\n\nIMPORTANT DATA RULES:\n- Preserve these original fields exactly:\n  incident_id\n  source\n  server\n  service\n  alert_type\n  severity\n- Do not invent missing incident information.\n- Do not change the original severity.\n- Do not treat a probable cause as a confirmed root cause.\n\nHUMAN REVIEW RULES:\n- Critical incidents MUST require human review.\n- High-severity incidents SHOULD normally require human review unless the incident is clearly understood and confidence is very high.\n- Medium-severity incidents require human review when confidence is below 0.80 or the situation is ambiguous.\n- Low-severity incidents normally do NOT require human review when the situation is clear and confidence is 0.80 or higher.\n- Low-severity incidents SHOULD require human review when the situation is ambiguous, potentially harmful, or confidence is below 0.80.\n\nCONFIDENCE RULES:\n- 0.90-1.00: Very high confidence; evidence is clear.\n- 0.80-0.89: High confidence; evidence is reasonably clear.\n- 0.60-0.79: Moderate confidence; important uncertainty remains.\n- Below 0.60: Low confidence; human review is strongly recommended.\n\nIMPORTANT:\nDo not automatically set needs_human_review to true only because an incident exists.\nFor low-severity, clearly understood incidents with confidence >= 0.80, set needs_human_review to false.\n\nALLOWED ACTIONS:\n- check_service_status\n- inspect_logs\n- check_disk_usage\n- check_cpu_usage\n- check_memory_usage\n- notify_devops\n- none\n\nACTION SELECTION GUIDELINES:\n- service_down → check_service_status or inspect_logs\n- high_cpu → check_cpu_usage\n- high_memory → check_memory_usage\n- disk_usage → check_disk_usage\n- unclear or insufficient evidence → inspect_logs\n- if no investigation is appropriate → none\n- Do not recommend destructive or irreversible actions.\n- Never recommend arbitrary shell commands.\n- Never recommend deleting files, restarting production services, modifying configurations, or changing infrastructure automatically.\n\nOriginal incident data:\n\n{{ JSON.stringify($json) }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        672,
+        128
+      ],
+      "id": "0955ea80-4df9-478f-9008-84816dc9876c",
+      "name": "AI Incident Analysis"
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3-30b-a3b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        680,
+        360
+      ],
+      "id": "bee40de2-abce-4fb0-a1df-d459e970daa1",
+      "name": "AI Incident Analysis1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "HBJALSuZir8UVLae",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"incident_id\": {\n      \"type\": \"string\"\n    },\n    \"source\": {\n      \"type\": \"string\"\n    },\n    \"server\": {\n      \"type\": \"string\"\n    },\n    \"service\": {\n      \"type\": \"string\"\n    },\n    \"alert_type\": {\n      \"type\": \"string\"\n    },\n    \"incident_type\": {\n      \"type\": \"string\"\n    },\n    \"severity\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"low\",\n        \"medium\",\n        \"high\",\n        \"critical\"\n      ]\n    },\n    \"summary\": {\n      \"type\": \"string\"\n    },\n    \"probable_cause\": {\n      \"type\": \"string\"\n    },\n    \"recommended_action\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"check_service_status\",\n        \"inspect_logs\",\n        \"check_disk_usage\",\n        \"check_cpu_usage\",\n        \"check_memory_usage\",\n        \"notify_devops\",\n        \"none\"\n      ]\n    },\n    \"needs_human_review\": {\n      \"type\": \"boolean\"\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"minimum\": 0,\n      \"maximum\": 1\n    }\n  },\n  \"required\": [\n    \"incident_id\",\n    \"source\",\n    \"server\",\n    \"service\",\n    \"alert_type\",\n    \"incident_type\",\n    \"severity\",\n    \"summary\",\n    \"probable_cause\",\n    \"recommended_action\",\n    \"needs_human_review\",\n    \"confidence\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        808,
+        360
+      ],
+      "id": "559469b9-5704-46da-a829-bd3415058fa5",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n\nconst errors = [];\n\nconst allowedActions = [\n  'check_service_status',\n  'inspect_logs',\n  'check_disk_usage',\n  'check_cpu_usage',\n  'check_memory_usage',\n  'notify_devops',\n  'none'\n];\n\nconst allowedSeverities = [\n  'low',\n  'medium',\n  'high',\n  'critical'\n];\n\n// Validate severity\nif (!allowedSeverities.includes(data.severity)) {\n  errors.push('Invalid severity');\n}\n\n// Validate recommended action\nif (!allowedActions.includes(data.recommended_action)) {\n  errors.push('Invalid recommended action');\n}\n\n// Validate confidence\nif (\n  typeof data.confidence !== 'number' ||\n  data.confidence < 0 ||\n  data.confidence > 1\n) {\n  errors.push('Invalid confidence score');\n}\n\n// Validate human review flag\nif (typeof data.needs_human_review !== 'boolean') {\n  errors.push('Invalid human review flag');\n}\n\n// Critical incidents always require human review\nif (data.severity === 'critical') {\n  data.needs_human_review = true;\n}\n\n// Low confidence requires human review\nif (data.confidence < 0.80) {\n  data.needs_human_review = true;\n}\n\nreturn [\n  {\n    json: {\n      ...data,\n      ai_output_valid: errors.length === 0,\n      ai_validation_errors: errors\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        128
+      ],
+      "id": "57fa3c89-b59f-472f-9de8-0fa97bbc361a",
+      "name": "Validate AI Decision"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4cecf4f0-1bad-4042-a816-7483c91e5070",
+              "leftValue": "={{ $json.needs_human_review }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1696,
+        128
+      ],
+      "id": "e5170451-4fe2-42a4-b9ce-fe7b232858aa",
+      "name": "Human Review Required?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b2fa799-8d86-4c23-af08-fc5584727ee5",
+              "name": "incident_id",
+              "value": "={{ $json.output.incident_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6cecbff3-72fa-4dda-8406-2ce46ce0afaf",
+              "name": "source",
+              "value": "={{ $json.output.source }}",
+              "type": "string"
+            },
+            {
+              "id": "fa8d215c-e647-4291-bf14-144c2d2a0751",
+              "name": "server",
+              "value": "={{ $json.output.server }}",
+              "type": "string"
+            },
+            {
+              "id": "40849c36-d14b-4be0-8ec7-e62614237513",
+              "name": "service",
+              "value": "={{ $json.output.service }}",
+              "type": "string"
+            },
+            {
+              "id": "810580b0-012a-4bdb-baba-1a4b58108404",
+              "name": "alert_type",
+              "value": "={{ $json.output.alert_type }}",
+              "type": "string"
+            },
+            {
+              "id": "b8d10b67-a83b-4bfe-a654-220121ab0d9b",
+              "name": "incident_type",
+              "value": "={{ $json.output.incident_type }}",
+              "type": "string"
+            },
+            {
+              "id": "00c2d151-fa8f-4489-bec6-3d6766fee9ce",
+              "name": "severity",
+              "value": "={{ $json.output.severity }}",
+              "type": "string"
+            },
+            {
+              "id": "53b7ac21-d613-4f2c-bef2-ab14c74c92ae",
+              "name": "summary",
+              "value": "={{ $json.output.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "8435bbfb-1030-4872-8d27-fb125fb6cc7f",
+              "name": "probable_cause",
+              "value": "={{ $json.output.probable_cause }}",
+              "type": "string"
+            },
+            {
+              "id": "e1cbd8aa-ff6a-46ec-890a-350647873aec",
+              "name": "recommended_action",
+              "value": "={{ $json.output.recommended_action }}",
+              "type": "string"
+            },
+            {
+              "id": "db768aac-a9fc-429f-b6ee-ff289b462c9a",
+              "name": "needs_human_review",
+              "value": "={{ $json.output.needs_human_review }}",
+              "type": "boolean"
+            },
+            {
+              "id": "3f3f8248-2c1b-48f5-bbd6-ed1db81b311b",
+              "name": "confidence",
+              "value": "={{ $json.output.confidence }}",
+              "type": "number"
+            },
+            {
+              "id": "2bfef08f-92d1-42a4-a3b7-c0549ccdda96",
+              "name": "status",
+              "value": "={{ $json.output.needs_human_review? 'human_review' : 'new' }}",
+              "type": "string"
+            },
+            {
+              "id": "399372c1-a05b-4d55-b34d-7d8e11ff63a6",
+              "name": "=created_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1248,
+        128
+      ],
+      "id": "57c97567-ec0c-494c-873a-ac076f1642d5",
+      "name": "Prepare Incident Record"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "iO2VRUGZY2QHHHzz",
+          "mode": "list",
+          "cachedResultName": "devops_incidents",
+          "cachedResultUrl": "/projects/C7cGbGRm6xPSNeEl/datatables/iO2VRUGZY2QHHHzz"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "needs_human_review": "={{ $json.needs_human_review }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "source": "={{ $json.source }}",
+            "server": "={{ $json.server }}",
+            "service": "={{ $json.service }}",
+            "alert_type": "={{ $json.alert_type }}",
+            "incident_type": "={{ $json.incident_type }}",
+            "severity": "={{ $json.severity }}",
+            "summary": "={{ $json.summary }}",
+            "probable_cause": "={{ $json.probable_cause }}",
+            "recommended_action": "={{ $json.recommended_action }}",
+            "confidence": "={{ $json.confidence }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "server",
+              "displayName": "server",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "alert_type",
+              "displayName": "alert_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "incident_type",
+              "displayName": "incident_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "probable_cause",
+              "displayName": "probable_cause",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "recommended_action",
+              "displayName": "recommended_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "needs_human_review",
+              "displayName": "needs_human_review",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1472,
+        128
+      ],
+      "id": "58eaa4b3-2007-4982-be14-0dbc52882f6b",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "sendTo": "hajizadeh.nahid@gmail.com",
+        "subject": "=[DEVOPS HUMAN REVIEW] {{ $json.incident_id }} - {{ $json.severity }}",
+        "message": "=DevOps Incident Requires Human Review  Incident ID: {{ $json.incident_id }} Severity: {{ $json.severity }} Source: {{ $json.source }} Server: {{ $json.server }} Service: {{ $json.service }} Alert Type: {{ $json.alert_type }}  Summary: {{ $json.summary }}  Probable Cause: {{ $json.probable_cause }}  Recommended Action: {{ $json.recommended_action }}  AI Confidence: {{ $json.confidence }}  Reason for Human Review: {{ $json.needs_human_review ? 'Human review required by incident guardrails.' : 'Human review not required.' }}  Status: {{ $json.status }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        -16
+      ],
+      "id": "d5b8d99f-147b-4419-b0d5-53894eb9c763",
+      "name": "Notify DevOps - Human Review",
+      "webhookId": "917687db-cb1c-4f25-adc2-8082c5c64a70",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "j819jAL9arto6YQC",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "iO2VRUGZY2QHHHzz",
+          "mode": "list",
+          "cachedResultName": "devops_incidents",
+          "cachedResultUrl": "/projects/C7cGbGRm6xPSNeEl/datatables/iO2VRUGZY2QHHHzz"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "keyValue": "={{ $('Human Review Required?').item.json.incident_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "needs_human_review": false,
+            "status": "notified"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "server",
+              "displayName": "server",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "service",
+              "displayName": "service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "alert_type",
+              "displayName": "alert_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "incident_type",
+              "displayName": "incident_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "probable_cause",
+              "displayName": "probable_cause",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "recommended_action",
+              "displayName": "recommended_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "needs_human_review",
+              "displayName": "needs_human_review",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2144,
+        -16
+      ],
+      "id": "8c0bdad3-f135-4a76-80a8-d15fff50a37e",
+      "name": "Update Incident Status"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n\nreturn [\n  {\n    json: {\n      ...data,\n      log_analysis_status: 'pending',\n      log_source: 'application_logs'\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        288
+      ],
+      "id": "34ebefd6-da56-45b5-bccf-752913021645",
+      "name": "Prepare Log Analysis"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n\nconst mockLogs = [\n  {\n    timestamp: \"2026-09-25T15:02:11Z\",\n    level: \"ERROR\",\n    service: data.service,\n    message: \"Database connection timeout\"\n  },\n  {\n    timestamp: \"2026-09-25T15:02:15Z\",\n    level: \"ERROR\",\n    service: data.service,\n    message: \"Failed to establish database connection\"\n  },\n  {\n    timestamp: \"2026-09-25T15:02:20Z\",\n    level: \"WARN\",\n    service: data.service,\n    message: \"Retrying database connection\"\n  }\n];\n\nreturn [\n  {\n    json: {\n      ...data,\n      logs: mockLogs\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        288
+      ],
+      "id": "7ea3963c-57b6-4e64-b710-d2b289f22363",
+      "name": "Mock Incident Logs"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI DevOps log analysis assistant.\n\nAnalyze the provided incident information and application logs.\n\nYour task is to:\n\n- Identify the most likely technical issue indicated by the logs.\n- Summarize the evidence found in the logs.\n- Identify the probable root cause as a hypothesis, not a confirmed fact.\n- Recommend exactly ONE safe investigation action.\n- Estimate your confidence based on the strength of the evidence.\n- Decide whether human review is required.\n\nIMPORTANT SAFETY RULES:\n\n- Do not recommend destructive or irreversible actions.\n- Do not recommend arbitrary shell commands.\n- Do not restart services automatically.\n- Do not modify configuration or infrastructure.\n- Do not delete files or data.\n- Do not claim that a root cause is confirmed unless the logs clearly prove it.\n- The recommended action MUST be selected from the allowed actions list.\n\nALLOWED ACTIONS:\n\n- check_service_status\n- inspect_logs\n- check_disk_usage\n- check_cpu_usage\n- check_memory_usage\n- notify_devops\n- none\n\nACTION GUIDELINES:\n\n- Service availability problems → check_service_status\n- Database or application errors → inspect_logs\n- High disk usage → check_disk_usage\n- High CPU usage → check_cpu_usage\n- High memory usage → check_memory_usage\n- If the incident requires human attention → notify_devops\n- If no investigation is appropriate → none\n- When evidence is insufficient, prefer inspect_logs rather than making assumptions.\n\nCONFIDENCE RULES:\n\nReturn a confidence score between 0 and 1.\n\nUse these guidelines:\n\n- 0.90–1.00: Very strong evidence and a clear technical issue.\n- 0.80–0.89: Strong evidence with limited uncertainty.\n- 0.60–0.79: Moderate evidence with meaningful uncertainty.\n- Below 0.60: Weak evidence and significant uncertainty.\n\nHUMAN REVIEW RULES:\n\nSet needs_human_review to true when:\n\n- The logs indicate a potentially serious issue.\n- The root cause is ambiguous or uncertain.\n- The recommended action could have significant operational impact.\n- Confidence is below 0.80.\n\nSet needs_human_review to false only when:\n\n- The issue is low risk.\n- The evidence is sufficiently clear.\n- The recommended action is safe.\n- Confidence is 0.80 or higher.\n\nIMPORTANT:\n\nThe AI only analyzes logs and recommends a safe investigation action.\n\nIt must NOT execute any action.\n\nThe n8n workflow will independently validate the AI decision before any further action.\n\nIncident information:\n\n{{ JSON.stringify({\n  incident_id: $json.incident_id,\n  server: $json.server,\n  service: $json.service,\n  alert_type: $json.alert_type,\n  severity: $json.severity,\n  summary: $json.summary\n}) }}\n\nApplication logs:\n\n{{ JSON.stringify($json.logs) }}\n\nReturn ONLY the structured fields required by the output schema.",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2368,
+        288
+      ],
+      "id": "838f94c4-ec78-4627-87ae-438df577a42d",
+      "name": "AI Log Analysis"
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3-30b-a3b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2376,
+        504
+      ],
+      "id": "08cafb42-028e-494c-9a47-38d32787ded7",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "HBJALSuZir8UVLae",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"technical_issue\": {\n      \"type\": \"string\"\n    },\n    \"evidence\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"probable_root_cause\": {\n      \"type\": \"string\"\n    },\n    \"recommended_action\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"check_service_status\",\n        \"inspect_logs\",\n        \"check_disk_usage\",\n        \"check_cpu_usage\",\n        \"check_memory_usage\",\n        \"notify_devops\",\n        \"none\"\n      ]\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"minimum\": 0,\n      \"maximum\": 1\n    },\n    \"needs_human_review\": {\n      \"type\": \"boolean\"\n    }\n  },\n  \"required\": [\n    \"technical_issue\",\n    \"evidence\",\n    \"probable_root_cause\",\n    \"recommended_action\",\n    \"confidence\",\n    \"needs_human_review\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2504,
+        504
+      ],
+      "id": "f2eb683c-fdb3-40a7-acfb-046c01c656bf",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.output ?? $json;\n\nconst errors = [];\n\nconst allowedActions = [\n  'check_service_status',\n  'inspect_logs',\n  'check_disk_usage',\n  'check_cpu_usage',\n  'check_memory_usage',\n  'notify_devops',\n  'none'\n];\n\nif (!allowedActions.includes(data.recommended_action)) {\n  errors.push('Invalid recommended action');\n}\n\nif (\n  typeof data.confidence !== 'number' ||\n  data.confidence < 0 ||\n  data.confidence > 1\n) {\n  errors.push('Invalid confidence score');\n}\n\nif (typeof data.needs_human_review !== 'boolean') {\n  errors.push('Invalid human review flag');\n}\n\n// Low-confidence log analysis requires human review\nif (data.confidence < 0.80) {\n  data.needs_human_review = true;\n}\n\nreturn [\n  {\n    json: {\n      ...data,\n      log_decision_valid: errors.length === 0,\n      log_validation_errors: errors\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        288
+      ],
+      "id": "09814c16-9e73-4c75-8838-64ff57e754d7",
+      "name": "Validate Log Decision"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "{{ $json.recommended_action }}",
+                    "rightValue": "check_service_status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "748add9b-86a6-49ea-92a9-900cb24a4101"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2e744e0c-2be6-4a04-9ecb-5c4fce379edf",
+                    "leftValue": "={{ $json.recommended_action }}",
+                    "rightValue": "inspect_logs",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ea010cbd-4310-4bbc-8144-a9f348c523a4",
+                    "leftValue": "={{ $json.recommended_action }}",
+                    "rightValue": "check_disk_usage",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f1116845-2ae9-4868-a62e-6ffac9ef10cd",
+                    "leftValue": "={{ $json.recommended_action }}",
+                    "rightValue": "check_cpu_usage",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "26441b69-4b7c-4b27-934e-85382a4f7cda",
+                    "leftValue": "={{ $json.recommended_action }}",
+                    "rightValue": "check_memory_usage",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3ba9dce9-e043-44f8-aad4-2975107c4b6b",
+                    "leftValue": "={{ $json.recommended_action }}",
+                    "rightValue": "notify_devops",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e6bb7d0b-7f30-4fa1-bb30-d2b9345206ef",
+                    "leftValue": "={{ $json.recommended_action }}",
+                    "rightValue": "none",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2944,
+        208
+      ],
+      "id": "944b69a1-6891-4321-b18d-f6d2dd7216c8",
+      "name": "Route Recommended Action"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2432,
+        -16
+      ],
+      "id": "f61f3708-b389-4566-b758-1927962d77b9",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Incident Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Incident Input": {
+      "main": [
+        [
+          {
+            "node": "Is Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "AI Incident Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Incident Analysis": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Incident Analysis1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Incident Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Incident Analysis",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Decision": {
+      "main": [
+        [
+          {
+            "node": "Prepare Incident Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Review Required?": {
+      "main": [
+        [
+          {
+            "node": "Notify DevOps - Human Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Log Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Incident Record": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Human Review Required?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify DevOps - Human Review": {
+      "main": [
+        [
+          {
+            "node": "Update Incident Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident Status": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Log Analysis": {
+      "main": [
+        [
+          {
+            "node": "Mock Incident Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Incident Logs": {
+      "main": [
+        [
+          {
+            "node": "AI Log Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Log Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Log Analysis",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Log Analysis": {
+      "main": [
+        [
+          {
+            "node": "Validate Log Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Log Decision": {
+      "main": [
+        [
+          {
+            "node": "Route Recommended Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "83c660d8-b11e-4f69-b88a-be130153bf5c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1cbe1b45e2489c28c5a04cf192859e09ee3096540cc98148c7f31acfe4e92f0a"
+  },
+  "nodeGroups": [],
+  "id": "g4Ug1c6AgxadiJvS",
+  "tags": []
+}
